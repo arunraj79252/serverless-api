@@ -4,6 +4,7 @@ frameworkVersion: '3'
 custom:
   tableName: 'users-table-${sls:stage}'
   demoTable: 'demo-table-${sls:stage}'
+  clientId: '48peqjjsp7pjostg6eng9ka4e5'
 
 provider:
   name: aws
@@ -25,6 +26,7 @@ provider:
   environment:
     USERS_TABLE: ${self:custom.tableName}
     DEMO_TABLE: ${self:custom.demoTable}
+    CLIENT_ID: ${self:custom.clientId}
 
 functions:
   api:

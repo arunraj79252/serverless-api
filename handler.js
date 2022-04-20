@@ -6,6 +6,7 @@ const serverless = require("serverless-http");
 const app = express();
 
 const USERS_TABLE = process.env.USERS_TABLE;
+const CLIENT_ID = process.env.CLIENT_ID;
 const dynamoDbClient = new AWS.DynamoDB.DocumentClient();
 const cognito = new AWS.CognitoIdentityServiceProvider();
 
@@ -130,7 +131,7 @@ app.delete("/users/:userId", async function (req,res) {
 app.post("/users/cognito-register", async function (req, res) {
   const { username, email, phone_number, password } = req.body;
   const params = {
-    ClientId: '48peqjjsp7pjostg6eng9ka4e5',
+    ClientId: CLIENT_ID,
     Username: username,
     Password: password,
     UserAttributes: [
@@ -162,7 +163,7 @@ app.post("/users/cognito-register", async function (req, res) {
 app.post("/users/cognito-confirm-register", async function (req, res) {
   const { username, confirmationCode } = req.body;
   const params = {
-    ClientId: '48peqjjsp7pjostg6eng9ka4e5', 
+    ClientId: CLIENT_ID, 
     ConfirmationCode: confirmationCode,
     Username: username, 
   }
