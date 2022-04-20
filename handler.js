@@ -1,11 +1,13 @@
 const AWS = require("aws-sdk");
 const express = require("express");
+const res = require("express/lib/response");
 const serverless = require("serverless-http");
 
 const app = express();
 
 const USERS_TABLE = process.env.USERS_TABLE;
 const dynamoDbClient = new AWS.DynamoDB.DocumentClient();
+const cognito = new AWS.CognitoIdentityServiceProvider();
 
 app.use(express.json());
 
@@ -71,11 +73,10 @@ app.put("/users/:userId", async function (req, res) {
     expressionAttributeNames[`#${key}`] = key;
     expressionAttributeValues[`:${key}`] = value
   }
-  console.log(updateExp, expressionAttributeNames, expressionAttributeValues)
   const params = {
     TableName: USERS_TABLE,
     Key: {userId: req.params.userId},
-    UpdateExpression: updateExp,
+    UpdateExpression: updateExp.substring(0, updateExp.lastIndexOf(',')),
     ExpressionAttributeNames: expressionAttributeNames,
     ExpressionAttributeValues: expressionAttributeValues
   };
@@ -87,11 +88,15 @@ app.put("/users/:userId", async function (req, res) {
     console.log(error);
     res.status(500).send({error: "Failed update"})
   }
-})
+});
 
 app.get("/users", async function (req, res) {
+  console.log(req.query.name);
   const params = {
     TableName: USERS_TABLE,
+    FilterExpression: '#name = :name',
+    ExpressionAttributeNames: { '#name': 'name' },
+    ExpressionAttributeValues: { ':name': req.query.name ? req.query.name : '' }
   };
 
   try {
@@ -101,6 +106,80 @@ app.get("/users", async function (req, res) {
   } catch (error) {
     console.log(error);
     res.status(500).send({error: "Failed to get users!"})
+  }
+});
+
+app.delete("/users/:userId", async function (req,res) {
+  const params = {
+    TableName : USERS_TABLE,
+    Key: {
+      userId: req.params.userId
+    }
+  }
+  try {
+    dynamoDbClient.delete(params).promise();
+    res.status(200);
+  } catch (error) {
+    console.log(error);
+    res.status(500).send({
+      message: "Failed to delete user!"
+    })
+  }
+});
+
+app.post("/users/cognito-register", async function (req, res) {
+  const { username, email, phone_number, password } = req.body;
+  const params = {
+    ClientId: '48peqjjsp7pjostg6eng9ka4e5',
+    Username: username,
+    Password: password,
+    UserAttributes: [
+      { 
+        Name: 'email', 
+        Value: email
+      }
+    ]
+  }
+  try {
+    cognito.signUp(params, function(err, data) {
+      if (err) {
+        console.log(err);
+        res.status(500).send({
+          message: 'Failed to sign up'
+        })
+      } else {
+        res.json(data);
+      }
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send({
+      message: error
+    })
+  }
+});
+
+app.post("/users/cognito-confirm-register", async function (req, res) {
+  const { username, confirmationCode } = req.body;
+  const params = {
+    ClientId: '48peqjjsp7pjostg6eng9ka4e5', 
+    ConfirmationCode: confirmationCode,
+    Username: username, 
+  }
+  try {
+    cognito.confirmSignUp(params, function (err, data) {
+      if (err) {
+        console.log(err);
+        res.status(500).send({
+          message:err
+        })
+      } else {
+        res.json(data);
+      }
+    })
+  } catch (error) {
+    console.log(error);
+    res.status(500).send('Verification failed');
   }
 })
 
