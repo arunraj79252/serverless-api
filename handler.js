@@ -1,5 +1,6 @@
 const AWS = require("aws-sdk");
 const express = require("express");
+const { param } = require("express/lib/request");
 const res = require("express/lib/response");
 const serverless = require("serverless-http");
 
@@ -7,6 +8,7 @@ const app = express();
 
 const USERS_TABLE = process.env.USERS_TABLE;
 const CLIENT_ID = process.env.CLIENT_ID;
+const USER_POOL_ID = process.env.USER_POOL_ID;
 const dynamoDbClient = new AWS.DynamoDB.DocumentClient();
 const cognito = new AWS.CognitoIdentityServiceProvider();
 
@@ -145,8 +147,8 @@ app.post("/users/cognito-register", async function (req, res) {
     cognito.signUp(params, function(err, data) {
       if (err) {
         console.log(err);
-        res.status(500).send({
-          message: 'Failed to sign up'
+        res.status(err.statusCode).send({
+          error: err
         })
       } else {
         res.json(data);
@@ -171,7 +173,7 @@ app.post("/users/cognito-confirm-register", async function (req, res) {
     cognito.confirmSignUp(params, function (err, data) {
       if (err) {
         console.log(err);
-        res.status(500).send({
+        res.status(err.statusCode).send({
           message:err
         })
       } else {
@@ -179,8 +181,38 @@ app.post("/users/cognito-confirm-register", async function (req, res) {
       }
     })
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).send('Verification failed');
+  }
+});
+
+app.post("/users/cognito-auth", async function (req, res) {
+  const { username, password } = req.body;
+  const params = {
+    ClientId: CLIENT_ID,
+    UserPoolId: USER_POOL_ID,
+    AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
+    AuthParameters: {
+      USERNAME: username,
+      PASSWORD: password
+    }
+  }
+  try {
+    cognito.adminInitiateAuth(params, function (err, data) {
+      if (err) {
+        console.log(err);
+        res.status(err.statusCode).send({
+          error: err
+        })
+      } else {
+        res.json(data);
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({
+      message: `Failed to authenticate ${username}`
+    })
   }
 })
 
