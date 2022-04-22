@@ -214,6 +214,35 @@ app.post("/users/cognito-auth", async function (req, res) {
       message: `Failed to authenticate ${username}`
     })
   }
+});
+
+app.post("/users/cognito-auth-refresh", async function(req, res) {
+  const { refreshToken } = req.body;
+  const params = {
+    ClientId: CLIENT_ID,
+    UserPoolId: USER_POOL_ID,
+    AuthFlow: 'REFRESH_TOKEN',
+    AuthParameters: {
+      REFRESH_TOKEN: refreshToken
+    }
+  }
+  try {
+    cognito.adminInitiateAuth(params, function (err, data) {
+      if (err) {
+        console.log(err);
+        res.status(err.statusCode).send({
+          error: err
+        })
+      } else {
+        res.json(data);
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({
+      message: `Failed to refresh token`
+    })
+  }
 })
 
 app.use((req, res, next) => {
