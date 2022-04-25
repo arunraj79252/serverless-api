@@ -32,7 +32,7 @@ jobs:
           node-version: 14.x
 
       - name: Install dependencies
-        run: yarn install
+        run: npm install
 
       - name: serverless deploy
         uses: serverless/github-action@master
