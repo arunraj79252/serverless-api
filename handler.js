@@ -7,6 +7,7 @@ const serverless = require("serverless-http");
 const app = express();
 
 const USERS_TABLE = process.env.USERS_TABLE;
+const DEMO_TABLE = process.env.DEMO_TABLE
 const CLIENT_ID = process.env.CLIENT_ID;
 const USER_POOL_ID = process.env.USER_POOL_ID;
 const dynamoDbClient = new AWS.DynamoDB.DocumentClient();
@@ -39,7 +40,7 @@ app.get("/users/:userId", async function (req, res) {
 });
 
 app.post("/users", async function (req, res) {
-  const { userId, name, email, password } = req.body;
+  const { userId, name, email, password, jobs: { jobId, jobName } } = req.body;
   if (typeof userId !== "string") {
     res.status(400).json({ error: '"userId" must be a string' });
   } else if (typeof name !== "string") {
@@ -53,7 +54,11 @@ app.post("/users", async function (req, res) {
       name: name,
       email: email,
       password: password,
-      date: Date()
+      date: Date(),
+      jobs: {
+        jobId: jobId,
+        jobName: jobName
+      }
     },
   };
 
@@ -78,7 +83,7 @@ app.put("/users/:userId", async function (req, res) {
   }
   const params = {
     TableName: USERS_TABLE,
-    Key: {userId: req.params.userId},
+    Key: { userId: req.params.userId },
     UpdateExpression: updateExp.substring(0, updateExp.lastIndexOf(',')),
     ExpressionAttributeNames: expressionAttributeNames,
     ExpressionAttributeValues: expressionAttributeValues
@@ -86,10 +91,10 @@ app.put("/users/:userId", async function (req, res) {
 
   try {
     await dynamoDbClient.update(params).promise();
-    res.json({userId, name});
+    res.json({ userId, name });
   } catch (error) {
     console.log(error);
-    res.status(500).send({error: "Failed update"})
+    res.status(500).send({ error: "Failed update" })
   }
 });
 
@@ -108,13 +113,13 @@ app.get("/users", async function (req, res) {
     res.json(users);
   } catch (error) {
     console.log(error);
-    res.status(500).send({error: "Failed to get users!"})
+    res.status(500).send({ error: "Failed to get users!" })
   }
 });
 
-app.delete("/users/:userId", async function (req,res) {
+app.delete("/users/:userId", async function (req, res) {
   const params = {
-    TableName : USERS_TABLE,
+    TableName: USERS_TABLE,
     Key: {
       userId: req.params.userId
     }
@@ -137,14 +142,14 @@ app.post("/users/cognito-register", async function (req, res) {
     Username: username,
     Password: password,
     UserAttributes: [
-      { 
-        Name: 'email', 
+      {
+        Name: 'email',
         Value: email
       }
     ]
   }
   try {
-    cognito.signUp(params, function(err, data) {
+    cognito.signUp(params, function (err, data) {
       if (err) {
         console.log(err);
         res.status(err.statusCode).send({
@@ -165,16 +170,16 @@ app.post("/users/cognito-register", async function (req, res) {
 app.post("/users/cognito-confirm-register", async function (req, res) {
   const { username, confirmationCode } = req.body;
   const params = {
-    ClientId: CLIENT_ID, 
+    ClientId: CLIENT_ID,
     ConfirmationCode: confirmationCode,
-    Username: username, 
+    Username: username,
   }
   try {
     cognito.confirmSignUp(params, function (err, data) {
       if (err) {
         console.log(err);
         res.status(err.statusCode).send({
-          message:err
+          message: err
         })
       } else {
         res.json(data);
@@ -216,7 +221,7 @@ app.post("/users/cognito-auth", async function (req, res) {
   }
 });
 
-app.post("/users/cognito-auth-refresh", async function(req, res) {
+app.post("/users/cognito-auth-refresh", async function (req, res) {
   const { refreshToken } = req.body;
   const params = {
     ClientId: CLIENT_ID,
@@ -245,11 +250,95 @@ app.post("/users/cognito-auth-refresh", async function(req, res) {
   }
 })
 
+app.post("/users/cognito-forgotpassword", async function (req, res) {
+  const { username } = req.body;
+  const params = {
+    ClientId: CLIENT_ID,
+    Username: username,
+  }
+  try {
+    cognito.forgotPassword(params, function (err, data) {
+      if (err) {
+        console.log(err);
+        res.status(err.statusCode).send({
+          message: err
+        })
+      } else {
+        res.json(data);
+      }
+    })
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('reset pasword failed');
+  }
+});
+
+
+app.post("/users/cognito-confirm-forgotpassword", async function (req, res) {
+  const { username, confirmationcode, password } = req.body;
+  const params = {
+    ClientId: CLIENT_ID,
+    ConfirmationCode: confirmationcode,
+    Password: password,
+    Username: username
+
+  }
+  try {
+    cognito.confirmForgotPassword(params, function (err, data) {
+      if (err) {
+        console.log(err);
+        res.status(err.statusCode).send({
+          message: err
+        })
+      } else {
+        res.json(data);
+      }
+    })
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Password updation failed');
+  }
+});
+
+app.post("/test/add", async function (req, res) {
+  const { id,name,clustermembers:[{email,role}]} = req.body;
+  if (typeof demoId !== "string") {
+    res.status(400).json({ error: '"userId" must be a string' });
+  } else if (typeof name !== "string") {
+    res.status(400).json({ error: '"name" must be a string' });
+  }
+
+  const params = {
+    TableName: DEMO_TABLE,
+    Item: {
+
+      demoId: id,
+      name: name,
+      clustermembers: [
+        {
+          email: email,
+          role: role,
+          demoId: id
+        }
+      ]
+    }
+  };
+
+  try {
+    await dynamoDbClient.put(params).promise();
+    res.json({ demoId, name });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: "Could not create user" });
+  }
+});
+
+
 app.use((req, res, next) => {
   return res.status(404).json({
     error: "Not Found",
   });
 });
 
-
 module.exports.handler = serverless(app);
+
